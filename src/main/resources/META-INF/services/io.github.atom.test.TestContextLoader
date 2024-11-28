@@ -1,0 +1,2 @@
+io.github.atom.test.loader.DubboContextLoader
+io.github.atom.test.loader.MyBatisContextLoader
