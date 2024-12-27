@@ -23,6 +23,9 @@ import java.util.concurrent.Executors;
  */
 public class NacosContextLoader {
 
+    /**
+     * nacos加载线程
+     */
     private static final ExecutorService NACOS_LOAD_POOL = Executors.newFixedThreadPool(1);
 
     /**
@@ -30,15 +33,22 @@ public class NacosContextLoader {
      */
     private static final CountDownLatch NACOS_CONFIG_LOAD_COUNT_DOWN = new CountDownLatch(1);
 
-
+    /**
+     * 读取nacos配置信息
+     *
+     * @param context 上下文
+     */
     public static void read(AnnotationConfigApplicationContext context) {
-        Class<?> nacosConfigPropertiesClass = TestClassUtil.tryGetClass("com.alibaba.cloud.nacos.NacosConfigProperties");
+
+        Class<?> nacosConfigPropertiesClass =
+            TestClassUtil.tryGetClass("com.alibaba.cloud.nacos.NacosConfigProperties");
         if (Objects.isNull(nacosConfigPropertiesClass)) {
             return;
         }
         NACOS_LOAD_POOL.execute(() -> {
             try {
-                Class<?> refreshAuto = TestClassUtil.tryGetClass("org.springframework.cloud.autoconfigure.RefreshAutoConfiguration");
+                Class<?> refreshAuto =
+                    TestClassUtil.tryGetClass("org.springframework.cloud.autoconfigure.RefreshAutoConfiguration");
                 if (Objects.nonNull(refreshAuto)) {
                     context.register(refreshAuto);
                 }
@@ -56,7 +66,11 @@ public class NacosContextLoader {
         });
     }
 
+    /**
+     * 等待加载
+     */
     public static void await() {
+
         try {
             NACOS_CONFIG_LOAD_COUNT_DOWN.await();
         } catch (Exception e) {
@@ -64,7 +78,12 @@ public class NacosContextLoader {
         }
     }
 
+    /**
+     * 加载完成
+     */
     public static void loaded() {
+
         NACOS_CONFIG_LOAD_COUNT_DOWN.countDown();
     }
+
 }

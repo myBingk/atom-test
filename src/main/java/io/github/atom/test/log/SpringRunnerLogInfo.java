@@ -16,7 +16,7 @@ public class SpringRunnerLogInfo extends SpringJUnit4ClassRunner {
 
     static {
         try {
-            LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+            LoggerContext loggerContext = (LoggerContext)LoggerFactory.getILoggerFactory();
             loggerContext.getLogger("ROOT").setLevel(Level.INFO);
             loggerContext.getLogger("org.springframework").setLevel(Level.ERROR);
             loggerContext.getLogger("com.alibaba.nacos").setLevel(Level.ERROR);
@@ -25,7 +25,15 @@ public class SpringRunnerLogInfo extends SpringJUnit4ClassRunner {
         }
     }
 
+    /**
+     * 构造器
+     *
+     * @param clazz 测试类
+     * @throws InitializationError 初始化异常时抛出
+     */
     public SpringRunnerLogInfo(Class<?> clazz) throws InitializationError {
+
         super(clazz);
     }
+
 }

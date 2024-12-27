@@ -14,6 +14,11 @@ import java.lang.annotation.*;
 @Inherited
 public @interface DynamicResource {
 
+    /**
+     * 是否Dubbo资源
+     *
+     * @return 是否Dubbo资源
+     */
     boolean dubboReference() default false;
 
 }

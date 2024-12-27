@@ -100,36 +100,47 @@ public class FastDynamicBeanLoadingTest {
     /**
      * 上下文缓存（class为key）
      */
-    private static final Map<Class<?>, AnnotationConfigApplicationContext>
-        CLASS_APPLICATION_MAP
-        = new ConcurrentHashMap<>(16);
+    private static final Map<Class<?>, AnnotationConfigApplicationContext> CLASS_APPLICATION_MAP =
+        new ConcurrentHashMap<>(16);
 
     /**
      * 上下文缓存（beanName为key）
      */
-    private static final Map<String, AnnotationConfigApplicationContext> NAME_APPLICATION_MAP = new ConcurrentHashMap<>(
-        16);
+    private static final Map<String, AnnotationConfigApplicationContext> NAME_APPLICATION_MAP =
+        new ConcurrentHashMap<>(16);
 
+    /**
+     * 转换服务
+     */
     private static final ConversionService CONVERSION_SERVICE = new DefaultConversionService();
 
     /**
      * configuration缓存（beanName为key）
      */
-    public static final Map<String, List<Class<?>>>
-        BEAN_NAME_DEPENDENCY_CONFIGURATION_CLASSES
-        = new ConcurrentHashMap<>(16);
+    public static final Map<String, List<Class<?>>> BEAN_NAME_DEPENDENCY_CONFIGURATION_CLASSES =
+        new ConcurrentHashMap<>(16);
 
     /**
      * configuration缓存（beanClass为key）
      */
-    public static final Map<Class<?>, List<Class<?>>>
-        BEAN_CLASS_DEPENDENCY_CONFIGURATION_CLASSES
-        = new ConcurrentHashMap<>(16);
+    public static final Map<Class<?>, List<Class<?>>> BEAN_CLASS_DEPENDENCY_CONFIGURATION_CLASSES =
+        new ConcurrentHashMap<>(16);
 
+    /**
+     * 最小运行数
+     */
     private static ThreadPoolExecutor MAIN_RUNNER_POOL;
 
+    /**
+     * 是否已加载
+     */
     private static boolean IS_LOADED = false;
 
+    /**
+     * 单元测试执行前执行
+     *
+     * @throws Exception 测试异常
+     */
     @Before
     public void before() throws Exception {
 
@@ -162,6 +173,11 @@ public class FastDynamicBeanLoadingTest {
         IS_LOADED = true;
     }
 
+    /**
+     * 加载静态依赖
+     *
+     * @param testDynamicBeanLoading 注解信息
+     */
     private static void loadStaticClassDependency(DynamicBeanLoading testDynamicBeanLoading) {
 
         if (TestClassUtil.isArrayEmpty(testDynamicBeanLoading.staticClasses())) {
@@ -193,6 +209,13 @@ public class FastDynamicBeanLoadingTest {
 
     }
 
+    /**
+     * 添加属性源
+     *
+     * @param dynamicBeanLoading 注解信息
+     * @param env                环境信息
+     * @throws IOException 加载文件时异常
+     */
     private static void addPropertySource(DynamicBeanLoading dynamicBeanLoading, ConfigurableEnvironment env) throws
         IOException {
 
@@ -203,18 +226,34 @@ public class FastDynamicBeanLoadingTest {
                     env.getPropertySources().addLast(propertySource);
                 }
             } else {
-                ResourcePropertySource propertySource = new ResourcePropertySource(property,
-                    new ClassPathResource(property));
+                ResourcePropertySource propertySource =
+                    new ResourcePropertySource(property, new ClassPathResource(property));
                 env.getPropertySources().addLast(propertySource);
             }
         }
     }
 
+    /**
+     * 获取bean信息
+     *
+     * @param context 上下文
+     * @param clazz   类信息
+     * @param <T>     bean类型
+     * @return bean
+     */
     private static <T> T getBean(AnnotationConfigApplicationContext context, Class<T> clazz) {
 
         return context.getBean(clazz);
     }
 
+    /**
+     * 获取bean信息
+     *
+     * @param context  上下文
+     * @param beanName bean名称
+     * @param clazz    类信息
+     * @return bean
+     */
     private static Object tryGetBean(AnnotationConfigApplicationContext context, String beanName, Class<?> clazz) {
 
         if (ApplicationContext.class.isAssignableFrom(clazz)) {
@@ -234,6 +273,13 @@ public class FastDynamicBeanLoadingTest {
         return null;
     }
 
+    /**
+     * 获取bean信息
+     *
+     * @param context  上下文
+     * @param beanName bean名称
+     * @return bean
+     */
     private static Object tryGetBean(AnnotationConfigApplicationContext context, String beanName) {
 
         try {
@@ -254,13 +300,16 @@ public class FastDynamicBeanLoadingTest {
     //        }
     //    }
 
+    /**
+     * 扫描spring依赖
+     */
     private static void scanSpringBeans() {
 
         // 扫描Spring依赖
         AutoConfigurationImportSelector autoConfigurationImportSelector = new AutoConfigurationImportSelector();
         autoConfigurationImportSelector.setEnvironment(ALL_CONTEXT.getEnvironment());
-        String[] autoConfigurationList = autoConfigurationImportSelector.selectImports(AnnotationMetadata.introspect(
-            TEST_MAIN_RUN_CLASS));
+        String[] autoConfigurationList =
+            autoConfigurationImportSelector.selectImports(AnnotationMetadata.introspect(TEST_MAIN_RUN_CLASS));
         for (String autoConfiguration : autoConfigurationList) {
             Class<?> autoConfigurationClass = TestClassUtil.tryGetClass(autoConfiguration);
             if (Objects.isNull(autoConfigurationClass)) {
@@ -271,15 +320,19 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 分析依赖关系
+     *
+     * @param autoConfigurationClass 配置类
+     */
     private static void analysisConfigurationComponentScan(Class<?> autoConfigurationClass) {
 
         ComponentScan componentScan = tryGetAnnotation(autoConfigurationClass, ComponentScan.class);
         if (Objects.isNull(componentScan)) {
             return;
         }
-        ClassPathScanningCandidateComponentProvider
-            componentScanScanner
-            = new ClassPathScanningCandidateComponentProvider(false);
+        ClassPathScanningCandidateComponentProvider componentScanScanner =
+            new ClassPathScanningCandidateComponentProvider(false);
         componentScanScanner.addIncludeFilter(new AnnotationTypeFilter(Configuration.class));
         for (String componentScanPath : componentScan.value()) {
             Set<BeanDefinition> candidateComponents = componentScanScanner.findCandidateComponents(componentScanPath);
@@ -289,6 +342,11 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 解析配置信息
+     *
+     * @param autoConfigurationClass 配置类
+     */
     private static void analysisConfigurationClass(Class<?> autoConfigurationClass) {
 
         if (Objects.isNull(autoConfigurationClass)) {
@@ -304,10 +362,18 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 代理对象
+     *
+     * @param target            目标对象
+     * @param clazz             类信息
+     * @param createdProxy      已创建的代理
+     * @param createdClassProxy 已创建代理的类型
+     */
     private static void agent(Object target,
-        Class<?> clazz,
-        Map<String, Object> createdProxy,
-        Map<Class<?>, Object> createdClassProxy) {
+                              Class<?> clazz,
+                              Map<String, Object> createdProxy,
+                              Map<Class<?>, Object> createdClassProxy) {
 
         if (Objects.isNull(clazz) || Object.class.equals(clazz)) {
             return;
@@ -343,10 +409,8 @@ public class FastDynamicBeanLoadingTest {
 
             if (isAnnotationWithDubboReference(declaredField)) {
                 String beanName = getBeanName(declaredField);
-                Object enhanceProxy = createDubboEnhanceProxy(beanName,
-                    declaredField.getType(),
-                    createdProxy,
-                    createdClassProxy);
+                Object enhanceProxy =
+                    createDubboEnhanceProxy(beanName, declaredField.getType(), createdProxy, createdClassProxy);
                 if (StringUtils.hasText(beanName)) {
                     createdProxy.put(beanName, enhanceProxy);
                 }
@@ -372,7 +436,8 @@ public class FastDynamicBeanLoadingTest {
             Object cglibProxy = createCglibProxy(beanName,
                 Objects.nonNull(baseMapperRawFiled) ? baseMapperRawFiled : declaredField.getType(),
                 createdProxy,
-                createdClassProxy);
+                createdClassProxy
+            );
             try {
                 declaredField.setAccessible(true);
                 declaredField.set(target, cglibProxy);
@@ -381,9 +446,16 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 添加构造器依赖
+     *
+     * @param declaredConstructors       构造器
+     * @param constructorDependency      构造器依赖
+     * @param constructorDependencyClass 已添加的构造器依赖
+     */
     private static void addConstructorDependency(Constructor<?>[] declaredConstructors,
-        Set<String> constructorDependency,
-        Set<Class<?>> constructorDependencyClass) {
+                                                 Set<String> constructorDependency,
+                                                 Set<Class<?>> constructorDependencyClass) {
 
         if (TestClassUtil.isArrayEmpty(declaredConstructors)) {
             return;
@@ -403,9 +475,16 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 添加方法依赖
+     *
+     * @param declaredMethods            方法
+     * @param constructorDependency      方法依赖
+     * @param constructorDependencyClass 已添加的方法依赖
+     */
     private static void addMethodDependency(Method[] declaredMethods,
-        Set<String> constructorDependency,
-        Set<Class<?>> constructorDependencyClass) {
+                                            Set<String> constructorDependency,
+                                            Set<Class<?>> constructorDependencyClass) {
 
         if (TestClassUtil.isArrayEmpty(declaredMethods)) {
             return;
@@ -430,6 +509,12 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 扫描并代理对象
+     *
+     * @param mainClass  主类
+     * @param testTarget 测试对象
+     */
     private static void scanBeansAndAgent(Class<?> mainClass, Object testTarget) {
 
         SpringBootApplication springBootApplication = mainClass.getAnnotation(SpringBootApplication.class);
@@ -464,6 +549,11 @@ public class FastDynamicBeanLoadingTest {
 
     }
 
+    /**
+     * 代理测试变量
+     *
+     * @param testTarget 测试变量
+     */
     private static void agentTestField(Object testTarget) {
 
         for (Field declaredField : testTarget.getClass().getDeclaredFields()) {
@@ -490,9 +580,16 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 获取导入链
+     *
+     * @param configurationClass 配置类
+     * @param chainClassList     配置类列表
+     * @param importClassList    导入类
+     */
     private static void getAllChainClassAndImportClass(Class<?> configurationClass,
-        List<Class<?>> chainClassList,
-        List<Class<?>> importClassList) {
+                                                       List<Class<?>> chainClassList,
+                                                       List<Class<?>> importClassList) {
 
         AutoConfigureAfter configAutoConfigureAfter = tryGetAnnotation(configurationClass, AutoConfigureAfter.class);
         if (Objects.nonNull(configAutoConfigureAfter)
@@ -542,6 +639,12 @@ public class FastDynamicBeanLoadingTest {
 
     }
 
+    /**
+     * 判断不是配置类
+     *
+     * @param configurationClass 配置类
+     * @return 是否配置类
+     */
     private static boolean isNotConfigurationClass(Class<?> configurationClass) {
 
         try {
@@ -551,6 +654,11 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 扫描接口依赖
+     *
+     * @param clazz 类型
+     */
     private static void scanInterfaceDependencies(Class<?> clazz) {
 
         Class<?>[] interfaces = clazz.getInterfaces();
@@ -567,8 +675,14 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 添加配置类依赖
+     *
+     * @param autoConfigurationClass 配置类
+     * @param rootConfigurationClass 配置类根类
+     */
     private static void addConfigurationDependency(Class<?> autoConfigurationClass,
-        Class<?>... rootConfigurationClass) {
+                                                   Class<?>... rootConfigurationClass) {
 
         if (Objects.isNull(autoConfigurationClass)) {
             return;
@@ -614,6 +728,13 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 获取扫描路径
+     *
+     * @param mainClass             主类
+     * @param springBootApplication 启动注解
+     * @return 扫描路径
+     */
     private static Set<String> getScanBasePackageSet(Class<?> mainClass, SpringBootApplication springBootApplication) {
 
         String[] scanBasePackages = springBootApplication.scanBasePackages();
@@ -627,10 +748,19 @@ public class FastDynamicBeanLoadingTest {
         return Sets.newHashSet(scanBasePackages);
     }
 
+    /**
+     * 创建cglib代理
+     *
+     * @param name              名称
+     * @param targetClass       对象类
+     * @param createdProxy      已创建的代理
+     * @param createdClassProxy 已创建的代理类
+     * @return cglib代理对象
+     */
     private static Object createCglibProxy(String name,
-        Class<?> targetClass,
-        Map<String, Object> createdProxy,
-        Map<Class<?>, Object> createdClassProxy) {
+                                           Class<?> targetClass,
+                                           Map<String, Object> createdProxy,
+                                           Map<Class<?>, Object> createdClassProxy) {
 
         if (createdClassProxy.containsKey(targetClass)) {
             return createdClassProxy.get(targetClass);
@@ -647,13 +777,15 @@ public class FastDynamicBeanLoadingTest {
                     dependencyClass,
                     createdProxy,
                     createdClassProxy,
-                    new SimpleBean(name, targetClass));
+                    new SimpleBean(name, targetClass)
+                );
             }
             Object enhanceProxy = Proxy.newProxyInstance(targetClass.getClassLoader(),
                 new Class[] {targetClass},
                 ((proxy, method, args) -> {
                     return method.invoke(registerNewAndGet(name, targetClass), args);
-                }));
+                })
+            );
             if (StringUtils.hasText(name)) {
                 createdProxy.put(name, enhanceProxy);
             }
@@ -665,11 +797,21 @@ public class FastDynamicBeanLoadingTest {
         return createEnhanceProxy(name, targetClass, createdProxy, createdClassProxy);
     }
 
+    /**
+     * 创建增强代理
+     *
+     * @param name              名称
+     * @param targetClass       对象类
+     * @param createdProxy      已创建的代理
+     * @param createdClassProxy 已创建的代理类
+     * @param simpleBeans       简单bean信息
+     * @return cglib代理对象
+     */
     private static Object createEnhanceProxy(String name,
-        Class<?> targetClass,
-        Map<String, Object> createdProxy,
-        Map<Class<?>, Object> createdClassProxy,
-        SimpleBean... simpleBeans) {
+                                             Class<?> targetClass,
+                                             Map<String, Object> createdProxy,
+                                             Map<Class<?>, Object> createdClassProxy,
+                                             SimpleBean... simpleBeans) {
 
         String packageName = targetClass.getPackage().getName();
         boolean isMainPackage = packageName.startsWith(MAIN_CLASS_PACKAGE);
@@ -678,7 +820,8 @@ public class FastDynamicBeanLoadingTest {
                 targetClass.getInterfaces(),
                 ((proxy, method, args) -> {
                     return method.invoke(registerNewAndGet(name, targetClass), args);
-                }));
+                })
+            );
             addedProxy(name, targetClass, createdProxy, createdClassProxy, enhanceProxy, simpleBeans);
             return enhanceProxy;
         }
@@ -743,12 +886,22 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 添加代理
+     *
+     * @param name              名称
+     * @param targetClass       目标对象
+     * @param createdProxy      已创建的代理
+     * @param createdClassProxy 已创建的代理类
+     * @param enhanceProxy      增强代理
+     * @param simpleBeans       简单类信息
+     */
     private static void addedProxy(String name,
-        Class<?> targetClass,
-        Map<String, Object> createdProxy,
-        Map<Class<?>, Object> createdClassProxy,
-        Object enhanceProxy,
-        SimpleBean[] simpleBeans) {
+                                   Class<?> targetClass,
+                                   Map<String, Object> createdProxy,
+                                   Map<Class<?>, Object> createdClassProxy,
+                                   Object enhanceProxy,
+                                   SimpleBean[] simpleBeans) {
 
         if (StringUtils.hasText(name)) {
             createdProxy.put(name, enhanceProxy);
@@ -764,10 +917,19 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 创建dubbo代理
+     *
+     * @param name              名称
+     * @param targetClass       目标对象
+     * @param createdProxy      已创建的代理
+     * @param createdClassProxy 已创建的代理类
+     * @return dubbo代理
+     */
     private static Object createDubboEnhanceProxy(String name,
-        Class<?> targetClass,
-        Map<String, Object> createdProxy,
-        Map<Class<?>, Object> createdClassProxy) {
+                                                  Class<?> targetClass,
+                                                  Map<String, Object> createdProxy,
+                                                  Map<Class<?>, Object> createdClassProxy) {
 
         try {
             Object enhanceProxy = Proxy.newProxyInstance(targetClass.getClassLoader(),
@@ -775,8 +937,10 @@ public class FastDynamicBeanLoadingTest {
                 ((proxy, method, args) -> {
                     return method.invoke(registerNewAndGet(name,
                         targetClass,
-                        TestClassUtil.tryGetClass("org.apache.dubbo.config.annotation.DubboReference")), args);
-                }));
+                        TestClassUtil.tryGetClass("org.apache.dubbo.config.annotation.DubboReference")
+                    ), args);
+                })
+            );
             if (StringUtils.hasText(name)) {
                 createdProxy.put(name, enhanceProxy);
             }
@@ -787,6 +951,14 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 注册新bean对象并返回
+     *
+     * @param name              bean名称
+     * @param targetClass       bean类型
+     * @param annotationClasses 注解信息
+     * @return bean对象
+     */
     private static Object registerNewAndGet(String name, Class<?> targetClass, Class<?>... annotationClasses) {
 
         NacosContextLoader.await();
@@ -807,8 +979,8 @@ public class FastDynamicBeanLoadingTest {
             }
         }
         Set<Class<?>> registeredClasses = Sets.newHashSet();
-        List<Class<?>> nameDependencyConfigurationList = BEAN_NAME_DEPENDENCY_CONFIGURATION_CLASSES.getOrDefault(name,
-            Collections.emptyList());
+        List<Class<?>> nameDependencyConfigurationList =
+            BEAN_NAME_DEPENDENCY_CONFIGURATION_CLASSES.getOrDefault(name, Collections.emptyList());
         for (Class<?> dependencyConfiguration : nameDependencyConfigurationList) {
             if (registeredClasses.contains(dependencyConfiguration)) {
                 continue;
@@ -816,9 +988,8 @@ public class FastDynamicBeanLoadingTest {
             newApplicationContext.register(dependencyConfiguration);
             registeredClasses.add(dependencyConfiguration);
         }
-        List<Class<?>> classDependencyConfigurationList = BEAN_CLASS_DEPENDENCY_CONFIGURATION_CLASSES.getOrDefault(
-            targetClass,
-            Collections.emptyList());
+        List<Class<?>> classDependencyConfigurationList =
+            BEAN_CLASS_DEPENDENCY_CONFIGURATION_CLASSES.getOrDefault(targetClass, Collections.emptyList());
         for (Class<?> dependencyConfiguration : classDependencyConfigurationList) {
             if (registeredClasses.contains(dependencyConfiguration)) {
                 continue;
@@ -838,6 +1009,14 @@ public class FastDynamicBeanLoadingTest {
         return registerBean;
     }
 
+    /**
+     * 刷新并获取bean
+     *
+     * @param context     上下文
+     * @param name        名称
+     * @param targetClass 对象类型
+     * @return bean
+     */
     public static Object refreshAndGet(AnnotationConfigApplicationContext context, String name, Class<?> targetClass) {
 
         NacosContextLoader.await();
@@ -860,6 +1039,11 @@ public class FastDynamicBeanLoadingTest {
         return registerBean;
     }
 
+    /**
+     * 创建新的spring上下文
+     *
+     * @return spring上下文
+     */
     private static AnnotationConfigApplicationContext getNewApplicationContext() {
 
         AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext();
@@ -867,6 +1051,12 @@ public class FastDynamicBeanLoadingTest {
         return applicationContext;
     }
 
+    /**
+     * 空依赖对象
+     *
+     * @author Zhang Kangkang
+     * @version 1.0
+     */
     private static class EmptyDependsOnProcessor implements BeanFactoryPostProcessor {
 
         @Override
@@ -883,6 +1073,13 @@ public class FastDynamicBeanLoadingTest {
 
     }
 
+    /**
+     * 创建空对象
+     *
+     * @param clazz 对象类型
+     * @return 空对象
+     * @throws Exception 创建异常时抛出
+     */
     private static Object createEmptyInstance(Class<?> clazz) throws Exception {
 
         Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
@@ -893,6 +1090,12 @@ public class FastDynamicBeanLoadingTest {
         return unsafe.allocateInstance(clazz);
     }
 
+    /**
+     * 获取bean名称
+     *
+     * @param clazz 类
+     * @return bean名称
+     */
     private static String getBeanName(Class<?> clazz) {
 
         Qualifier qualifier = AnnotationUtils.findAnnotation(clazz, Qualifier.class);
@@ -906,6 +1109,12 @@ public class FastDynamicBeanLoadingTest {
         return annotation.value();
     }
 
+    /**
+     * 获取bean名称
+     *
+     * @param field 字段
+     * @return bean名称
+     */
     private static String getBeanName(Field field) {
 
         Qualifier qualifier = AnnotationUtils.findAnnotation(field, Qualifier.class);
@@ -919,11 +1128,23 @@ public class FastDynamicBeanLoadingTest {
         return field.getName();
     }
 
+    /**
+     * 是否bean方法
+     *
+     * @param method 方法
+     * @return 是否bean方法
+     */
     private static boolean isBeanMethod(Method method) {
 
         return method.isAnnotationPresent(Bean.class);
     }
 
+    /**
+     * 获取bean名称
+     *
+     * @param method 方法
+     * @return bean名称
+     */
     private static String[] getBeanName(Method method) {
 
         Bean bean = AnnotationUtils.findAnnotation(method, Bean.class);
@@ -937,6 +1158,13 @@ public class FastDynamicBeanLoadingTest {
         return new String[] {method.getName()};
     }
 
+    /**
+     * 从已注册的上下文获取bean
+     *
+     * @param clazz    类型
+     * @param beanName 名称
+     * @return bean
+     */
     private static Object getFromRegisterContext(Class<?> clazz, String beanName) {
 
         if (StringUtils.hasText(beanName)) {
@@ -958,6 +1186,14 @@ public class FastDynamicBeanLoadingTest {
         return null;
     }
 
+    /**
+     * 获取类注解
+     *
+     * @param cls           类信息
+     * @param annotationCls 注解类
+     * @param <T>           注解类型
+     * @return 类注解
+     */
     private static <T extends Annotation> T tryGetAnnotation(Class<?> cls, Class<T> annotationCls) {
 
         try {
@@ -967,50 +1203,102 @@ public class FastDynamicBeanLoadingTest {
         }
     }
 
+    /**
+     * 是否dubbo变量
+     *
+     * @param field 变量
+     * @return 是否dubbo变量
+     */
     private static boolean isAnnotationWithDubboReference(Field field) {
 
-        Class<? extends Annotation> dubboReferenceClass = TestClassUtil.tryGetAnnotation(
-            "org.apache.dubbo.config.annotation.DubboReference");
+        Class<? extends Annotation> dubboReferenceClass =
+            TestClassUtil.tryGetAnnotation("org.apache.dubbo.config.annotation.DubboReference");
         if (Objects.nonNull(dubboReferenceClass) && field.isAnnotationPresent(dubboReferenceClass)) {
             return true;
         }
-        Class<? extends Annotation> dubboReferenceClass2 = TestClassUtil.tryGetAnnotation(
-            "org.apache.dubbo.config.annotation.Reference");
+        Class<? extends Annotation> dubboReferenceClass2 =
+            TestClassUtil.tryGetAnnotation("org.apache.dubbo.config.annotation.Reference");
         if (Objects.nonNull(dubboReferenceClass2) && field.isAnnotationPresent(dubboReferenceClass2)) {
             return true;
         }
-        Class<? extends Annotation> dubboReferenceClass3 = TestClassUtil.tryGetAnnotation(
-            "com.alibaba.dubbo.config.annotation.Reference");
+        Class<? extends Annotation> dubboReferenceClass3 =
+            TestClassUtil.tryGetAnnotation("com.alibaba.dubbo.config.annotation.Reference");
         return Objects.nonNull(dubboReferenceClass3) && field.isAnnotationPresent(dubboReferenceClass3);
     }
 
+    /**
+     * 获取dubbo服务类
+     *
+     * @return dubbo服务类
+     */
     private static List<Class<? extends Annotation>> getDubboServiceClass() {
 
-        Class<? extends Annotation> dubboServiceClass = TestClassUtil.tryGetAnnotation(
-            "org.apache.dubbo.config.annotation.DubboService");
-        Class<? extends Annotation> dubboServiceClass2 = TestClassUtil.tryGetAnnotation(
-            "org.apache.dubbo.config.annotation.Service");
-        Class<? extends Annotation> dubboServiceClass3 = TestClassUtil.tryGetAnnotation(
-            "com.alibaba.dubbo.config.annotation.Service");
+        Class<? extends Annotation> dubboServiceClass =
+            TestClassUtil.tryGetAnnotation("org.apache.dubbo.config.annotation.DubboService");
+        Class<? extends Annotation> dubboServiceClass2 =
+            TestClassUtil.tryGetAnnotation("org.apache.dubbo.config.annotation.Service");
+        Class<? extends Annotation> dubboServiceClass3 =
+            TestClassUtil.tryGetAnnotation("com.alibaba.dubbo.config.annotation.Service");
         return Arrays.asList(dubboServiceClass, dubboServiceClass2, dubboServiceClass3);
     }
 
-    @Getter
-    @ToString
+    /**
+     * 简单bean对象
+     *
+     * @author Zhang Kangkang
+     * @version 1.0
+     */
     static class SimpleBean {
 
+        /**
+         * 名称
+         */
         private final String name;
 
+        /**
+         * 类型
+         */
         private final Class<?> beanClass;
 
+        /**
+         * 构造简单bean对象
+         *
+         * @param name      名称
+         * @param beanClass 类型
+         */
         SimpleBean(String name, Class<?> beanClass) {
 
             this.name = name;
             this.beanClass = beanClass;
         }
 
+        /**
+         * 获取bean名称
+         *
+         * @return bean名称
+         */
+        public String getName() {
+
+            return name;
+        }
+
+        /**
+         * 获取bean类型
+         *
+         * @return bean类型
+         */
+        public Class<?> getBeanClass() {
+
+            return beanClass;
+        }
+
     }
 
+    /**
+     * 获取主执行线程
+     *
+     * @return 主执行线程
+     */
     private static ThreadPoolExecutor getMainExecPool() {
 
         if (Objects.isNull(MAIN_RUNNER_POOL)) {
@@ -1021,7 +1309,8 @@ public class FastDynamicBeanLoadingTest {
                         0,
                         TimeUnit.SECONDS,
                         new ArrayBlockingQueue<>(1),
-                        new ThreadPoolExecutor.CallerRunsPolicy());
+                        new ThreadPoolExecutor.CallerRunsPolicy()
+                    );
                     try {
                         Field maximumPoolSize = ThreadPoolExecutor.class.getDeclaredField("maximumPoolSize");
                         maximumPoolSize.setAccessible(true);

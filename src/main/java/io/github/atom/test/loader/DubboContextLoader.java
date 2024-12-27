@@ -24,10 +24,26 @@ import java.util.Objects;
  */
 public class DubboContextLoader implements TestContextLoader {
 
+    /**
+     * dubbo简单缓存
+     */
     private static final Map<String, Object> DUBBO_SIMPLE_CACHE = new HashMap<>();
 
+    /**
+     * 判断能否处理bean
+     *
+     * @param context     上下文
+     * @param name        beanName
+     * @param targetClass beanClass
+     * @param annotations bean依赖注解
+     * @return 能否处理依赖
+     */
     @Override
-    public boolean canHandle(AnnotationConfigApplicationContext context, String name, Class<?> targetClass, Class<?>[] annotations) {
+    public boolean canHandle(AnnotationConfigApplicationContext context,
+                             String name,
+                             Class<?> targetClass,
+                             Class<?>[] annotations) {
+
         if (annotations == null) {
             return false;
         }
@@ -39,18 +55,27 @@ public class DubboContextLoader implements TestContextLoader {
         return false;
     }
 
+    /**
+     * 获取bean
+     *
+     * @param context     上下文
+     * @param name        beanName
+     * @param targetClass beanClass
+     * @param annotations bean依赖注解
+     * @return bean
+     */
     @Override
-    public Object getOrCreate(AnnotationConfigApplicationContext context, String name, Class<?> targetClass, Class<?>[] annotations) {
+    public Object getOrCreate(AnnotationConfigApplicationContext context,
+                              String name,
+                              Class<?> targetClass,
+                              Class<?>[] annotations) {
 
         Object referenceConfigCache = DUBBO_SIMPLE_CACHE.get(targetClass.getSimpleName());
         if (Objects.nonNull(referenceConfigCache)) {
             return referenceConfigCache;
         }
 
-        ReferenceConfig reference =
-                ReferenceBuilder.newBuilder()
-                        .interfaceClass(targetClass)
-                        .build();
+        ReferenceConfig reference = ReferenceBuilder.newBuilder().interfaceClass(targetClass).build();
         ConfigurableEnvironment env = context.getEnvironment();
 
         ApplicationConfig applicationConfig = new ApplicationConfig();
@@ -70,14 +95,15 @@ public class DubboContextLoader implements TestContextLoader {
         registryConfig.setVersion(env.getProperty("dubbo.provider.version"));
 
         DubboBootstrap.getInstance()
-                .application(applicationConfig)
-                .registry(registryConfig)
-                .protocol(new ProtocolConfig(env.getProperty("dubbo.protocol.name"),
-                        Integer.parseInt(Objects.requireNonNull(env.getProperty("dubbo.protocol.port")))))
-                .consumer(
-                        consumerConfig
-                )
-                .reference(reference).start();
+            .application(applicationConfig)
+            .registry(registryConfig)
+            .protocol(new ProtocolConfig(
+                env.getProperty("dubbo.protocol.name"),
+                Integer.parseInt(Objects.requireNonNull(env.getProperty("dubbo.protocol.port")))
+            ))
+            .consumer(consumerConfig)
+            .reference(reference)
+            .start();
         Object referenceObject = reference.get();
         DUBBO_SIMPLE_CACHE.put(targetClass.getSimpleName(), referenceObject);
         return referenceObject;

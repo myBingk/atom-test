@@ -16,21 +16,29 @@ public @interface DynamicBeanLoading {
 
     /**
      * 程序运行主类
+     *
+     * @return 程序运行主类
      */
     Class<?> mainClass();
 
     /**
      * 测试用例运行所需的配置文件，需在target/classes里能找到
+     *
+     * @return 测试用例运行所需的配置文件
      */
     String[] properties();
 
     /**
      * 是否读取nacos配置
+     *
+     * @return 是否读取nacos配置
      */
     boolean nacosEnabled() default false;
 
     /**
      * 测试用例运行所需装载的静态类
+     *
+     * @return 测试用例运行所需装载的静态类
      */
     Class<?>[] staticClasses() default {};
 
