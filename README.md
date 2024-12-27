@@ -4,7 +4,7 @@
 ##### 1.引入依赖
 ```
 <dependency>
-    <groupId>io.github</groupId>
+    <groupId>io.github.mybingk</groupId>
     <artifactId>atom-test</artifactId>
     <version>1.0</version>
 </dependency>
