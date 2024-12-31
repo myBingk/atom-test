@@ -35,7 +35,7 @@ public final class TestClassUtil {
     }};
 
     /**
-     * 构造方法
+     * 测试类构造器
      */
     private TestClassUtil() {
 
@@ -43,11 +43,11 @@ public final class TestClassUtil {
     }
 
     /**
-     * 判断类是否实现接口
+     * 是否实现接口
      *
-     * @param clazz         类型
+     * @param clazz         类
      * @param interfaceName 接口名
-     * @return 类是否实现接口
+     * @return 是否实现接口
      */
     public static boolean hasInterface(Class<?> clazz, String interfaceName) {
 
@@ -59,10 +59,10 @@ public final class TestClassUtil {
     }
 
     /**
-     * 根据名称获取类
+     * 根据class名称加载class
      *
-     * @param className 名称
-     * @return 类
+     * @param className class名称
+     * @return class
      */
     public static Class<?> tryGetClass(String className) {
 
@@ -74,10 +74,10 @@ public final class TestClassUtil {
     }
 
     /**
-     * 根据名称获取注解
+     * 获取注解信息
      *
-     * @param className 名称
-     * @return 注解
+     * @param className 注解类
+     * @return 注解信息
      */
     public static Class<? extends Annotation> tryGetAnnotation(String className) {
 
@@ -96,7 +96,7 @@ public final class TestClassUtil {
      * 实例化对象
      *
      * @param clazz 类
-     * @return 对象
+     * @return 实例对象
      */
     public static Object tryInstance(Class<?> clazz) {
 
@@ -111,11 +111,11 @@ public final class TestClassUtil {
     }
 
     /**
-     * 是否空数组
+     * 数组是否为空
      *
      * @param array 数组
      * @param <T>   数组类型
-     * @return 是否空数组
+     * @return 是否为空
      */
     public static <T> boolean isArrayEmpty(T[] array) {
 
@@ -123,11 +123,11 @@ public final class TestClassUtil {
     }
 
     /**
-     * 是否非空数组
+     * 数组是否不为空
      *
      * @param array 数组
      * @param <T>   数组类型
-     * @return 是否非空数组
+     * @return 是否不为空
      */
     public static <T> boolean isArrayNotEmpty(T[] array) {
 
@@ -135,10 +135,10 @@ public final class TestClassUtil {
     }
 
     /**
-     * 是否基本类型
+     * 是否基本类型或包装类型
      *
      * @param clazz 类
-     * @return 是否基本类型
+     * @return 是否基本类型或包装类型
      */
     public static boolean isPrimitiveOrWrapper(Class<?> clazz) {
 
@@ -146,11 +146,11 @@ public final class TestClassUtil {
     }
 
     /**
-     * 获取泛型的实际类
+     * 获取泛型实际类型
      *
      * @param genericSuperclass 泛型
-     * @param actualType        实际类
-     * @return 泛型的实际类
+     * @param actualType        实际类型
+     * @return 泛型实际类型
      */
     public static Class<?> getActualClass(Type genericSuperclass, Class<?> actualType) {
 

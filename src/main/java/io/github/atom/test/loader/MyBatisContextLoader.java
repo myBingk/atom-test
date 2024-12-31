@@ -3,7 +3,6 @@ package io.github.atom.test.loader;
 import com.google.common.collect.Sets;
 import io.github.atom.test.FastDynamicBeanLoadingTest;
 import io.github.atom.test.utils.TestClassUtil;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -21,7 +20,6 @@ import java.util.*;
  * @author Zhang Kangkang
  * @version 1.0
  */
-@Slf4j
 public class MyBatisContextLoader implements TestContextLoader {
 
     /**
@@ -48,10 +46,10 @@ public class MyBatisContextLoader implements TestContextLoader {
     }
 
     /**
-     * 是否包含mapper
+     * 是否包含mapper包路径
      *
-     * @param clazz 类信息
-     * @return 是否包含mapper
+     * @param clazz 类
+     * @return 是否包含mapper包路径
      */
     private boolean containPackage(Class<?> clazz) {
 
@@ -91,7 +89,7 @@ public class MyBatisContextLoader implements TestContextLoader {
     }
 
     /**
-     * 添加seata支持
+     * 添加Seata配置
      *
      * @param context 上下文
      */
@@ -161,11 +159,11 @@ public class MyBatisContextLoader implements TestContextLoader {
     }
 
     /**
-     * 是否获取baseMapper方法
+     * 是否getBaseMapper方法
      *
-     * @param configClass 类
+     * @param configClass 配置类
      * @param methodName  方法名
-     * @return 是否获取baseMapper方法
+     * @return 是否getBaseMapper方法
      */
     public static boolean isGetBaseMapperMethod(Class<?> configClass, String methodName) {
 
@@ -176,11 +174,11 @@ public class MyBatisContextLoader implements TestContextLoader {
     }
 
     /**
-     * 获取baseMapper字段
+     * 获取baseMapper对象
      *
-     * @param rootClass 跟类
+     * @param rootClass 类
      * @param field     字段
-     * @return baseMapper字段
+     * @return baseMapper对象
      */
     public static Class<?> getBaseMapperRawFiled(Class<?> rootClass, Field field) {
 

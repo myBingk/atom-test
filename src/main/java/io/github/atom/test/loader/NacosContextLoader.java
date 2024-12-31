@@ -39,16 +39,13 @@ public class NacosContextLoader {
      * @param context 上下文
      */
     public static void read(AnnotationConfigApplicationContext context) {
-
-        Class<?> nacosConfigPropertiesClass =
-            TestClassUtil.tryGetClass("com.alibaba.cloud.nacos.NacosConfigProperties");
+        Class<?> nacosConfigPropertiesClass = TestClassUtil.tryGetClass("com.alibaba.cloud.nacos.NacosConfigProperties");
         if (Objects.isNull(nacosConfigPropertiesClass)) {
             return;
         }
         NACOS_LOAD_POOL.execute(() -> {
             try {
-                Class<?> refreshAuto =
-                    TestClassUtil.tryGetClass("org.springframework.cloud.autoconfigure.RefreshAutoConfiguration");
+                Class<?> refreshAuto = TestClassUtil.tryGetClass("org.springframework.cloud.autoconfigure.RefreshAutoConfiguration");
                 if (Objects.nonNull(refreshAuto)) {
                     context.register(refreshAuto);
                 }
