@@ -6,7 +6,7 @@
 <dependency>
     <groupId>io.github.mybingk</groupId>
     <artifactId>atom-test</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 ##### 2.代码示例
