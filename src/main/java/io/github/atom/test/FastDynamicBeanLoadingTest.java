@@ -573,7 +573,7 @@ public class FastDynamicBeanLoadingTest {
             for (BeanDefinition beanDefinition : candidateComponents) {
                 Class<?> compentClass = TestClassUtil.tryGetClass(beanDefinition.getBeanClassName());
                 if (Objects.isNull(compentClass)) {
-                    return;
+                    continue;
                 }
                 scanInterfaceDependencies(compentClass);
                 addConfigurationDependency(compentClass);
