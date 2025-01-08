@@ -7,6 +7,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.io.support.SpringFactoriesLoader;
+import org.springframework.util.AntPathMatcher;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -53,8 +54,10 @@ public class MyBatisContextLoader implements TestContextLoader {
      */
     private boolean containPackage(Class<?> clazz) {
 
+        AntPathMatcher matcher = new AntPathMatcher();
         for (String mapperPackage : MAPPER_PACKAGE_SET) {
-            if (clazz.isInterface() && clazz.getPackage().getName().startsWith(mapperPackage)) {
+            boolean match = matcher.match(mapperPackage, clazz.getPackage().getName());
+            if (clazz.isInterface() && match) {
                 return true;
             }
         }
