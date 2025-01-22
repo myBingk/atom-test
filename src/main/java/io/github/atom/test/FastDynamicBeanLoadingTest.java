@@ -147,6 +147,11 @@ public class FastDynamicBeanLoadingTest {
     private static final ExecutorService ASYNC_LOADER = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
 
     /**
+     * 已创建的代理缓存（class为key）
+     */
+    private static final Map<Class<?>, Object> CREATED_CLASS_PROXY_MAP = Maps.newHashMap();
+
+    /**
      * 测试用例执行前装载上下文，代理对象
      */
     @Before
@@ -175,9 +180,10 @@ public class FastDynamicBeanLoadingTest {
         TEST_MAIN_RUN_CLASS = testDynamicBeanLoading.mainClass();
         MAIN_CLASS_PACKAGE = TEST_MAIN_RUN_CLASS.getPackage().getName();
 
-        scanBeansAndAgent(TEST_MAIN_RUN_CLASS, this);
+        scanBeans(TEST_MAIN_RUN_CLASS);
         scanSpringBeans();
         loadStaticClassDependency(testDynamicBeanLoading);
+        agentTestField(this);
         IS_LOADED = true;
     }
 
@@ -192,9 +198,36 @@ public class FastDynamicBeanLoadingTest {
             return;
         }
         for (Class<?> staticClass : testDynamicBeanLoading.staticClasses()) {
+
+            String packageName = staticClass.getPackage().getName();
+            boolean isMainPackage = packageName.startsWith(MAIN_CLASS_PACKAGE);
+
+            if (staticClass.isInterface()) {
+                List<Class<?>> implClasses = BEAN_CLASS_IMPL_MAP.get(staticClass);
+                if (TestClassUtil.isCollectionEmpty(implClasses)) {
+                    continue;
+                }
+                for (Class<?> implClass : implClasses) {
+                    if (Objects.isNull(AnnotationUtils.findAnnotation(implClass, Component.class))) {
+                        continue;
+                    }
+                    if (isMainPackage) {
+                        CREATED_CLASS_PROXY_MAP.put(implClass,
+                            createCglibProxy(getBeanName(implClass), implClass)
+                        );
+                        continue;
+                    }
+                    CREATED_CLASS_PROXY_MAP.put(implClass, registerNewAndGet(getBeanName(implClass), implClass));
+                }
+                continue;
+            }
+            if (isMainPackage) {
+                CREATED_CLASS_PROXY_MAP.put(staticClass, createCglibProxy(getBeanName(staticClass), staticClass));
+                continue;
+            }
             Component staticComponent = AnnotationUtils.findAnnotation(staticClass, Component.class);
             if (Objects.nonNull(staticComponent)) {
-                registerNewAndGet(getBeanName(staticClass), staticClass);
+                CREATED_CLASS_PROXY_MAP.put(staticClass, registerNewAndGet(getBeanName(staticClass), staticClass));
                 continue;
             }
             Field[] declaredFields = staticClass.getDeclaredFields();
@@ -207,12 +240,65 @@ public class FastDynamicBeanLoadingTest {
                 }
                 try {
                     Object fieldValue = registerNewAndGet(getBeanName(declaredField), declaredField.getType());
+                    CREATED_CLASS_PROXY_MAP.put(declaredField.getType(), fieldValue);
                     declaredField.setAccessible(true);
                     declaredField.set(null, fieldValue);
                 } catch (Exception ignore) {
                 }
             }
+        }
 
+        Class<?> applicationContextAwareClass =
+            TestClassUtil.tryGetClass("org.springframework.context.ApplicationContextAware");
+        if (Objects.isNull(applicationContextAwareClass)) {
+            return;
+        }
+        AnnotationConfigApplicationContext staticApplicationContext = getNewApplicationContext();
+        staticApplicationContext.refresh();
+        for (Map.Entry<Class<?>, Object> createdProxyEntry : CREATED_CLASS_PROXY_MAP.entrySet()) {
+            String beanName = getBeanName(createdProxyEntry.getKey());
+            if (staticApplicationContext.containsBean(beanName)) {
+                continue;
+            }
+            staticApplicationContext.getBeanFactory().registerSingleton(beanName, createdProxyEntry.getValue());
+        }
+        for (AnnotationConfigApplicationContext app : CLASS_APPLICATION_MAP.values()) {
+            for (String beanName : app.getBeanDefinitionNames()) {
+                if (staticApplicationContext.containsBean(beanName)) {
+                    continue;
+                }
+                staticApplicationContext.getBeanFactory().registerSingleton(beanName, app.getBean(beanName));
+            }
+        }
+        for (AnnotationConfigApplicationContext app : NAME_APPLICATION_MAP.values()) {
+            for (String beanName : app.getBeanDefinitionNames()) {
+                if (staticApplicationContext.containsBean(beanName)) {
+                    continue;
+                }
+                staticApplicationContext.getBeanFactory().registerSingleton(beanName, app.getBean(beanName));
+            }
+        }
+
+        for (Class<?> clazz : BEAN_CLASS_IMPL_MAP.get(applicationContextAwareClass)) {
+
+            String packageName = clazz.getPackage().getName();
+            boolean isMainPackage = packageName.startsWith(MAIN_CLASS_PACKAGE);
+
+            Object bean;
+            if (isMainPackage) {
+                bean = createCglibProxy(getBeanName(clazz), clazz);
+            } else {
+                bean = registerNewAndGet(getBeanName(clazz), clazz);
+            }
+            if (Objects.isNull(bean)) {
+                continue;
+            }
+            CREATED_CLASS_PROXY_MAP.put(clazz, bean);
+            try {
+                Method setApplicationContextMethod = clazz.getMethod("setApplicationContext", ApplicationContext.class);
+                setApplicationContextMethod.invoke(bean, staticApplicationContext);
+            } catch (Exception ignore) {
+            }
         }
 
     }
@@ -400,21 +486,16 @@ public class FastDynamicBeanLoadingTest {
     /**
      * 代理对象
      *
-     * @param target            对象
-     * @param clazz             类
-     * @param createdProxy      已代理对象
-     * @param createdClassProxy 已代理对象类
+     * @param target 对象
+     * @param clazz  类
      */
-    private static void agent(Object target,
-                              Class<?> clazz,
-                              Map<String, Object> createdProxy,
-                              Map<Class<?>, Object> createdClassProxy) {
+    private static void agent(Object target, Class<?> clazz) {
 
         if (Objects.isNull(clazz) || Object.class.equals(clazz)) {
             return;
         }
         Class<?> superclass = clazz.getSuperclass();
-        agent(target, superclass, createdProxy, createdClassProxy);
+        agent(target, superclass);
         Field[] declaredFields = clazz.getDeclaredFields();
         if (TestClassUtil.isArrayEmpty(declaredFields)) {
             return;
@@ -444,12 +525,8 @@ public class FastDynamicBeanLoadingTest {
 
             if (isAnnotationWithDubboReference(declaredField)) {
                 String beanName = getBeanName(declaredField);
-                Object enhanceProxy =
-                    createDubboEnhanceProxy(beanName, declaredField.getType(), createdProxy, createdClassProxy);
-                if (StringUtils.hasText(beanName)) {
-                    createdProxy.put(beanName, enhanceProxy);
-                }
-                createdClassProxy.put(declaredField.getType(), enhanceProxy);
+                Object enhanceProxy = createDubboEnhanceProxy(beanName, declaredField.getType());
+                CREATED_CLASS_PROXY_MAP.put(declaredField.getType(), enhanceProxy);
                 try {
                     declaredField.setAccessible(true);
                     declaredField.set(target, enhanceProxy);
@@ -469,9 +546,7 @@ public class FastDynamicBeanLoadingTest {
 
             Class<?> baseMapperRawFiled = MyBatisContextLoader.getBaseMapperRawFiled(target.getClass(), declaredField);
             Object cglibProxy = createCglibProxy(beanName,
-                Objects.nonNull(baseMapperRawFiled) ? baseMapperRawFiled : declaredField.getType(),
-                createdProxy,
-                createdClassProxy
+                Objects.nonNull(baseMapperRawFiled) ? baseMapperRawFiled : declaredField.getType()
             );
             try {
                 declaredField.setAccessible(true);
@@ -547,10 +622,9 @@ public class FastDynamicBeanLoadingTest {
     /**
      * 扫描需要代理的对象
      *
-     * @param mainClass  主运行类
-     * @param testTarget 测试对象
+     * @param mainClass 主运行类
      */
-    private static void scanBeansAndAgent(Class<?> mainClass, Object testTarget) {
+    private static void scanBeans(Class<?> mainClass) {
 
         SpringBootApplication springBootApplication = mainClass.getAnnotation(SpringBootApplication.class);
         if (Objects.isNull(springBootApplication)) {
@@ -579,9 +653,6 @@ public class FastDynamicBeanLoadingTest {
                 addConfigurationDependency(compentClass);
             }
         }
-
-        agentTestField(testTarget);
-
     }
 
     /**
@@ -600,14 +671,13 @@ public class FastDynamicBeanLoadingTest {
             }
             try {
                 declaredField.setAccessible(true);
-                Map<String, Object> createdProxy = Maps.newHashMap();
-                Map<Class<?>, Object> createdClassProxy = Maps.newHashMap();
+
                 if (dynamicResource.dubboReference()) {
-                    Object cglibProxy = createDubboEnhanceProxy(name, type, createdProxy, createdClassProxy);
+                    Object cglibProxy = createDubboEnhanceProxy(name, type);
                     declaredField.set(testTarget, cglibProxy);
                     continue;
                 }
-                Object cglibProxy = createCglibProxy(name, type, createdProxy, createdClassProxy);
+                Object cglibProxy = createCglibProxy(name, type);
                 declaredField.set(testTarget, cglibProxy);
             } catch (Exception e) {
                 throw new RuntimeException("dynamic inject bean failed:" + name, e);
@@ -786,19 +856,14 @@ public class FastDynamicBeanLoadingTest {
     /**
      * 代理对象
      *
-     * @param name              名称
-     * @param targetClass       类
-     * @param createdProxy      已创建的代理
-     * @param createdClassProxy 已创建的代理类
+     * @param name        名称
+     * @param targetClass 类
      * @return 代理对象
      */
-    private static Object createCglibProxy(String name,
-                                           Class<?> targetClass,
-                                           Map<String, Object> createdProxy,
-                                           Map<Class<?>, Object> createdClassProxy) {
+    private static Object createCglibProxy(String name, Class<?> targetClass) {
 
-        if (createdClassProxy.containsKey(targetClass)) {
-            return createdClassProxy.get(targetClass);
+        if (CREATED_CLASS_PROXY_MAP.containsKey(targetClass)) {
+            return CREATED_CLASS_PROXY_MAP.get(targetClass);
         }
         if (ThreadPoolExecutor.class.equals(targetClass)) {
             return getMainExecPool();
@@ -810,8 +875,6 @@ public class FastDynamicBeanLoadingTest {
                 Class<?> dependencyClass = dependencyClasses.get(0);
                 return createEnhanceProxy(getBeanName(dependencyClass),
                     dependencyClass,
-                    createdProxy,
-                    createdClassProxy,
                     new SimpleBean(name, targetClass)
                 );
             }
@@ -821,43 +884,32 @@ public class FastDynamicBeanLoadingTest {
                     return method.invoke(registerNewAndGet(name, targetClass), args);
                 })
             );
-            if (StringUtils.hasText(name)) {
-                createdProxy.put(name, enhanceProxy);
-            }
-            createdClassProxy.put(targetClass, enhanceProxy);
-            agent(enhanceProxy, targetClass, createdProxy, createdClassProxy);
+            CREATED_CLASS_PROXY_MAP.put(targetClass, enhanceProxy);
+            agent(enhanceProxy, targetClass);
             return enhanceProxy;
         }
 
-        return createEnhanceProxy(name, targetClass, createdProxy, createdClassProxy);
+        return createEnhanceProxy(name, targetClass);
     }
 
     /**
      * 代理对象
      *
-     * @param name              名称
-     * @param targetClass       类
-     * @param createdProxy      已创建的代理
-     * @param createdClassProxy 已创建的代理类
-     * @param simpleBeans       简单bean信息
+     * @param name        名称
+     * @param targetClass 类
+     * @param simpleBeans 简单bean信息
      * @return 代理对象
      */
-    private static Object createEnhanceProxy(String name,
-                                             Class<?> targetClass,
-                                             Map<String, Object> createdProxy,
-                                             Map<Class<?>, Object> createdClassProxy,
-                                             SimpleBean... simpleBeans) {
+    private static Object createEnhanceProxy(String name, Class<?> targetClass, SimpleBean... simpleBeans) {
 
         String packageName = targetClass.getPackage().getName();
         boolean isMainPackage = packageName.startsWith(MAIN_CLASS_PACKAGE);
         if (Modifier.isFinal(targetClass.getModifiers())) {
             Object enhanceProxy = Proxy.newProxyInstance(targetClass.getClassLoader(),
                 targetClass.getInterfaces(),
-                ((proxy, method, args) -> {
-                    return method.invoke(registerNewAndGet(name, targetClass), args);
-                })
+                ((proxy, method, args) -> method.invoke(registerNewAndGet(name, targetClass), args))
             );
-            addedProxy(name, targetClass, createdProxy, createdClassProxy, enhanceProxy, simpleBeans);
+            addedProxy(targetClass, enhanceProxy, simpleBeans);
             return enhanceProxy;
         }
 
@@ -883,8 +935,8 @@ public class FastDynamicBeanLoadingTest {
         });
         try {
             Object enhanceProxy = enhancer.create();
-            addedProxy(name, targetClass, createdProxy, createdClassProxy, enhanceProxy, simpleBeans);
-            agent(enhanceProxy, targetClass, createdProxy, createdClassProxy);
+            addedProxy(targetClass, enhanceProxy, simpleBeans);
+            agent(enhanceProxy, targetClass);
             return enhanceProxy;
         } catch (Exception ignore) {
         }
@@ -913,8 +965,8 @@ public class FastDynamicBeanLoadingTest {
                     return method.invoke(registerNewAndGet(name, targetClass), args);
                 }
             });
-            addedProxy(name, targetClass, createdProxy, createdClassProxy, enhanceProxy, simpleBeans);
-            agent(enhanceProxy, targetClass, createdProxy, createdClassProxy);
+            addedProxy(targetClass, enhanceProxy, simpleBeans);
+            agent(enhanceProxy, targetClass);
             return enhanceProxy;
         } catch (Exception e) {
             throw new RuntimeException(String.format("无法代理对象,name:%s，class：%s", name, targetClass.getName()), e);
@@ -924,30 +976,16 @@ public class FastDynamicBeanLoadingTest {
     /**
      * 代理对象
      *
-     * @param name              名称
-     * @param targetClass       类
-     * @param createdProxy      已创建的代理
-     * @param createdClassProxy 已创建的代理类
-     * @param enhanceProxy      增强代理
-     * @param simpleBeans       简单bean信息
+     * @param targetClass  类
+     * @param enhanceProxy 增强代理
+     * @param simpleBeans  简单bean信息
      */
-    private static void addedProxy(String name,
-                                   Class<?> targetClass,
-                                   Map<String, Object> createdProxy,
-                                   Map<Class<?>, Object> createdClassProxy,
-                                   Object enhanceProxy,
-                                   SimpleBean[] simpleBeans) {
+    private static void addedProxy(Class<?> targetClass, Object enhanceProxy, SimpleBean[] simpleBeans) {
 
-        if (StringUtils.hasText(name)) {
-            createdProxy.put(name, enhanceProxy);
-        }
-        createdClassProxy.put(targetClass, enhanceProxy);
+        CREATED_CLASS_PROXY_MAP.put(targetClass, enhanceProxy);
         if (TestClassUtil.isArrayNotEmpty(simpleBeans)) {
             for (SimpleBean simpleBean : simpleBeans) {
-                if (StringUtils.hasText(simpleBean.getName())) {
-                    createdProxy.put(simpleBean.getName(), enhanceProxy);
-                }
-                createdClassProxy.put(simpleBean.getBeanClass(), enhanceProxy);
+                CREATED_CLASS_PROXY_MAP.put(simpleBean.getBeanClass(), enhanceProxy);
             }
         }
     }
@@ -955,16 +993,11 @@ public class FastDynamicBeanLoadingTest {
     /**
      * 代理Dubbo对象
      *
-     * @param name              名称
-     * @param targetClass       类
-     * @param createdProxy      已创建的代理
-     * @param createdClassProxy 已创建的代理类
+     * @param name        名称
+     * @param targetClass 类
      * @return Dubbo代理对象
      */
-    private static Object createDubboEnhanceProxy(String name,
-                                                  Class<?> targetClass,
-                                                  Map<String, Object> createdProxy,
-                                                  Map<Class<?>, Object> createdClassProxy) {
+    private static Object createDubboEnhanceProxy(String name, Class<?> targetClass) {
 
         try {
             Object enhanceProxy = Proxy.newProxyInstance(targetClass.getClassLoader(),
@@ -976,10 +1009,7 @@ public class FastDynamicBeanLoadingTest {
                     ), args);
                 })
             );
-            if (StringUtils.hasText(name)) {
-                createdProxy.put(name, enhanceProxy);
-            }
-            createdClassProxy.put(targetClass, enhanceProxy);
+            CREATED_CLASS_PROXY_MAP.put(targetClass, enhanceProxy);
             return enhanceProxy;
         } catch (Exception e) {
             throw new RuntimeException(String.format("无法代理对象,name:%s，class：%s", name, targetClass.getName()), e);

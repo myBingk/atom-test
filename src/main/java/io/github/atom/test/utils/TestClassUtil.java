@@ -5,6 +5,7 @@ import org.springframework.util.ClassUtils;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -120,6 +121,18 @@ public final class TestClassUtil {
     public static <T> boolean isArrayEmpty(T[] array) {
 
         return array == null || array.length == 0;
+    }
+
+    /**
+     * 集合是否为空
+     *
+     * @param array 集合
+     * @param <T>   集合类型
+     * @return 是否为空
+     */
+    public static <T> boolean isCollectionEmpty(Collection<T> array) {
+
+        return array == null || array.isEmpty();
     }
 
     /**
